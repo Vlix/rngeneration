@@ -112,16 +112,75 @@ It can either be:
 - a `string`: a `REQ`
 - an `array`: a list of `REQ`'s
     - empty array: no requirements
-- an OR `object`: `{"this": --req--, "or": --req--}`
-- an AND `object`: `{"this": --req--, "and": --req--}`
+- an `object`:
+    - any `REQ`: `{"choice": []}`
+        - Just one of the `REQ`s in the `array` are required
+    - an OR `object`: `{"a": --req--, "or": --req--}`
+    - an AND `object`: `{"a": --req--, "and": --req--}`
 
 The list of items means all the items in the
 list are required together. This is an easier way
 than having to chain AND `object`s.
 
-The AND `object` is still possible, since you
-might want to connect an OR `object` with a list
-of items, for example.
+The AND `object` is still helpful, since you
+might want to connect objects with each other in
+more complex patterns.
+
+The `"choice"` object means one of the `REQ`s in the
+`array` is required, instead of all in case the
+`"choice"` object is omitted and a regular `array`
+is used.
+
+### Requirement Definition
+
+Top level, requirements can be defined, so that
+they can be used by their name when defining connectors.
+
+The `"definition"` field contains the requirements
+this definition is a shortcut for.
+
+```json
+{
+  "type": "requirement",
+  "name": "can_smash_rocks",
+  "definition": {
+    "choice": [
+      "Bomb bag",
+      "Hammer",
+      "Goron Mask"
+    ]
+  }
+}
+```
+
+```yaml
+type: requirement
+name: can_smash_rocks
+definition:
+  choice:
+    - "Bomb bag"
+    - Hammer
+    - "Goron Mask"
+```
+
+## Option
+
+This is a requirement (just like an item or defined
+requirement), but this is a flag that's set at runtime
+and makes the randomization more modular.
+
+```json
+{
+  "type": "option",
+  "name": "L337 TRICK"
+}
+```
+
+```yaml
+type: option
+name: "L337 TRICK"
+```
+
 
 ## Example
 

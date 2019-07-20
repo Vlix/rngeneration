@@ -4,6 +4,8 @@
 module RNGeneration.Types where
 
 
+import Control.Applicative ((<|>))
+import Control.Monad (when)
 import Data.Aeson
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
@@ -71,18 +73,30 @@ newtype Collectable = Collectable {
 } deriving (FromJSON, Hashable)
   deriving newtype (Eq, Show)
 
--- | An option is the same as a Collectable, functionally.
--- The difference is, these are maybe "obtained" at runtime,
--- instead of while traversing the world.
-type Option = Collectable
+-- | An option is the pretty much the same as a Collectable,
+-- functionally. The difference is, these are maybe "obtained"
+-- at runtime, instead of while traversing the world.
+newtype Option = Option {
+  optionName :: Text
+} deriving (FromJSON, Hashable)
+  deriving newtype (Eq, Show)
 
-optionName :: Option -> Text
-optionName = collectableName
 
+data NamedRequirement = NamedReq Text Requirement
+
+instance FromJSON NamedRequirement where
+  parseJSON = withObject "Requirement Definition" $ \o -> do
+    typ <- o .: "type"
+    case typ of
+      "requirement" -> do
+          name <- o .: "name"
+          definition <- o .: "definition"
+          return $ NamedReq name definition
+      wat -> fail $ "Unrecognized \"type\" field: " <> wat
 
 -- | Requirements are defined by a set of collectables
 -- or a con-/disjuction of such sets
-data Requirement = Req (HashSet Collectable)
+data Requirement = Req (HashSet Text) -- ^ any Item/Option/NamedRequirement name
                  | Requirement :|| Requirement
                  | Requirement :&& Requirement
                  | IMPOSSIBLE
@@ -90,13 +104,22 @@ data Requirement = Req (HashSet Collectable)
 instance FromJSON Requirement where
   parseJSON Null = pure $ Req mempty
   parseJSON (Number n) = fail $ "Requirement can't be a number: " <> show n
-  parseJSON (String txt) = pure . Req $ HS.singleton $ Collectable txt
+  parseJSON (String txt) = pure . Req $ HS.singleton txt
   -- TODO: Might need to check for duplicates, or count them?
   parseJSON a@Array{} = Req . HS.fromList <$> parseJSON a
   parseJSON (Bool b) | b = pure $ Req mempty
                      | otherwise = pure IMPOSSIBLE
-  parseJSON val = withObject "Requirement" go val
-    where go o = do
+  parseJSON val = withObject
+      "Requirement"
+      (\o -> choice o <|> go o)
+      val
+    where choice o = do
+              choices <- o .: "choice"
+              when (null choices) $ fail errMsg
+              let (c:cs) = Req . HS.singleton <$> choices
+              return $ foldr (:||) c cs
+          errMsg = "\"choices\" fields needs an array with at least one value"
+          go o = do
             this <- o .: "this"
             mOR <- o .:? "or"
             case mOR of
