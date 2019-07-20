@@ -1,7 +1,9 @@
+{-# LANGUAGE TemplateHaskell #-}
 module RNGeneration.Parsing.Types where
 
 
 import Control.Applicative ((<|>))
+import Control.Lens (makeLenses)
 import Data.Aeson
 import Data.HashSet (HashSet)
 import Data.Text (Text)
@@ -25,56 +27,35 @@ instance FromJSON SettingPart where
               wat -> fail $ "Unrecognized \"type\" field: " <> wat
 
 data AllReqs = ReqItem Collectable
-             | ReqReq NamedRequirement
+             | ReqReq Text
              | ReqOption Option
 
 
+data ParseReport = ParseReport {
+  _nonExistentAreas :: [AreaName],   -- ^ Area names used, but not defined
+  _nonExistentReqs :: [Text],        -- ^ Reqs used, but not defined (Req = Item/Option/Req)
+  _unusedReqs :: [NamedRequirement], -- ^ Reqs defined, but not used
+  _unusedOptions :: [Option]         -- ^ Option defined, but not used
+}
+makeLenses ''ParseReport
+
 data ParseResult = ParseResult {
-  parsedReport :: Maybe ParseReport,
-  parsedAreas :: [Area],
-  parsedReqs :: [NamedRequirement]
+  _parsedAreas :: [Area],
+  _parsedReqs :: [NamedRequirement],
+  _parsedOptions :: [Option]
 }
-
-type ParseReport = ()
-
-data Settings = Settings {
-  allNames :: [AreaName],
-  allAreas :: [Area]
-}
+makeLenses ''ParseResult
 
 data ParseState = ParseState {
-  areaState :: AreaState,
-  reqState :: ReqState,
-  optionState :: OptionState,
-  parseResult :: ParseResult
+  _encounteredAreas :: HashSet AreaName, -- ^ Used in parsing to check duplicates
+  _duplicateAreas   :: [AreaName],       -- ^ Areas defined more than once
+  _encounteredReqs :: HashSet Text,      -- ^ Used in parsing to check duplicates
+  _duplicateReqs :: [NamedRequirement],  -- ^ Reqs defined more than once
+  _encounteredOptions :: HashSet Option, -- ^ Used in parsing to check duplicates
+  _duplicateOptions :: [Option],         -- ^ Options defined more than once
+  _parseResult :: ParseResult
 }
-
-data AreaState = AreaState {
-  encounteredAreas :: HashSet AreaName, -- ^ Used in parsing to check duplicates
-  duplicateAreas   :: [AreaName], -- ^ Areas defined more than once
-  nonExistentAreas :: [AreaName], -- ^ Area names used, but not defined
-  asParsedAreas    :: [Area]      -- ^ Collection of succesfully parsed Areas
-}
-
-data ReqState = ReqState {
-  encounteredReqs :: HashSet Text,
-  -- ^ Used in parsing to check duplicates
-  unusedReqs :: [NamedRequirement],
-  -- ^ Reqs defined, but not used
-  duplicateReqs :: [(NamedRequirement, NamedRequirement)],
-  -- ^ Reqs defined more than once
-  nonExistentReqs :: [Text],
-  -- ^ Reqs used, but not defined
-  --   (Req can be Item, Option or Req)
-  psParsedReqs :: [NamedRequirement]
-  -- ^ Collection of succesfully parsed Reqs
-}
-
-data OptionState = OptionState {
-  encounteredOptions :: HashSet Option, -- ^ Used in parsing to check duplicates
-  unusedOptions      :: [Option], -- ^ Option defined, but not used
-  osParsedOptions    :: [Option]  -- ^ Collection of succesfully parsed Options
-}
+makeLenses ''ParseState
 
 
 --------- SEMIGROUPS ---------
@@ -83,47 +64,28 @@ data OptionState = OptionState {
 
 instance Semigroup ParseResult where
    pr1 <> pr2 = ParseResult {
-      parsedReport = parsedReport pr1 <> parsedReport pr2,
-      parsedAreas = parsedAreas pr1 <> parsedAreas pr2,
-      parsedReqs = parsedReqs pr1 <> parsedReqs pr2
+      _parsedAreas = _parsedAreas pr1 <> _parsedAreas pr2,
+      _parsedReqs = _parsedReqs pr1 <> _parsedReqs pr2,
+      _parsedOptions = _parsedOptions pr1 <> _parsedOptions pr2
     }
 
-instance Semigroup Settings where
-  s1 <> s2 = Settings {
-      allNames = allNames s1 <> allNames s2,
-      allAreas = allAreas s1 <> allAreas s2
-    }
+instance Semigroup ParseReport where
+  pr1 <> pr2 = ParseReport {
+      _nonExistentAreas = _nonExistentAreas pr1 <> _nonExistentAreas pr2,
+      _nonExistentReqs = _nonExistentReqs pr1 <> _nonExistentReqs pr2,
+      _unusedReqs = _unusedReqs pr1 <> _unusedReqs pr2,
+      _unusedOptions = _unusedOptions pr1 <> _unusedOptions pr2
+}
 
 instance Semigroup ParseState where
   ps1 <> ps2 = ParseState {
-      areaState = areaState ps1 <> areaState ps2,
-      reqState = reqState ps1 <> reqState ps2,
-      optionState = optionState ps1 <> optionState ps2,
-      parseResult = parseResult ps1 <> parseResult ps2
-    }
-
-instance Semigroup AreaState where
-  as1 <> as2 = AreaState {
-      encounteredAreas = encounteredAreas as1 <> encounteredAreas as2,
-      duplicateAreas = duplicateAreas as1 <> duplicateAreas as2,
-      nonExistentAreas = nonExistentAreas as1 <> nonExistentAreas as2,
-      asParsedAreas = asParsedAreas as1 <> asParsedAreas as2
-    }
-
-instance Semigroup ReqState where
-  rs1 <> rs2 = ReqState {
-      encounteredReqs = encounteredReqs rs1 <> encounteredReqs rs2,
-      unusedReqs = unusedReqs rs1 <> unusedReqs rs2,
-      duplicateReqs = duplicateReqs rs1 <> duplicateReqs rs2,
-      nonExistentReqs = nonExistentReqs rs1 <> nonExistentReqs rs2,
-      psParsedReqs = psParsedReqs rs1 <> psParsedReqs rs2
-    }
-
-instance Semigroup OptionState where
-  os1 <> os2 = OptionState {
-      encounteredOptions = encounteredOptions os1 <> encounteredOptions os2,
-      unusedOptions = unusedOptions os1 <> unusedOptions os2,
-      osParsedOptions = osParsedOptions os1 <> osParsedOptions os2
+      _encounteredAreas = _encounteredAreas ps1 <> _encounteredAreas ps2,
+      _duplicateAreas = _duplicateAreas ps1 <> _duplicateAreas ps2,
+      _encounteredReqs = _encounteredReqs ps1 <> _encounteredReqs ps2,
+      _duplicateReqs = _duplicateReqs ps1 <> _duplicateReqs ps2,
+      _encounteredOptions = _encounteredOptions ps1 <> _encounteredOptions ps2,
+      _duplicateOptions = _duplicateOptions ps1 <> _duplicateOptions ps2,
+      _parseResult = _parseResult ps1 <> _parseResult ps2
     }
 
 
@@ -134,17 +96,8 @@ instance Semigroup OptionState where
 instance Monoid ParseResult where
   mempty = ParseResult mempty mempty mempty
 
-instance Monoid Settings where
-  mempty = Settings mempty mempty
+instance Monoid ParseReport where
+  mempty = ParseReport mempty mempty mempty mempty
 
 instance Monoid ParseState where
-  mempty = ParseState mempty mempty mempty mempty
-
-instance Monoid AreaState where
-  mempty = AreaState mempty mempty mempty mempty
-
-instance Monoid ReqState where
-  mempty = ReqState mempty mempty mempty mempty mempty
-
-instance Monoid OptionState where
-  mempty = OptionState mempty mempty mempty
+  mempty = ParseState mempty mempty mempty mempty mempty mempty mempty

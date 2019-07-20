@@ -65,13 +65,13 @@ data Connector = Connector {
 
 newtype AreaName = AreaName { getAreaName :: Text }
   deriving (FromJSON, FromJSONKey, Hashable)
-  deriving newtype (Eq, Show)
+  deriving newtype (Eq, Show, Ord)
 
 -- | Something to collect/place in the world.
 newtype Collectable = Collectable {
   collectableName :: Text
 } deriving (FromJSON, Hashable)
-  deriving newtype (Eq, Show)
+  deriving newtype (Eq, Show, Ord)
 
 -- | An option is the pretty much the same as a Collectable,
 -- functionally. The difference is, these are maybe "obtained"
@@ -79,7 +79,7 @@ newtype Collectable = Collectable {
 newtype Option = Option {
   optionName :: Text
 } deriving (FromJSON, Hashable)
-  deriving newtype (Eq, Show)
+  deriving newtype (Eq, Show, Ord)
 
 
 data NamedRequirement = NamedReq Text Requirement
