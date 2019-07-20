@@ -20,10 +20,20 @@ source-repository head
 
 library
   exposed-modules:  RNGeneration
-  -- other-modules: 
+  other-modules:    RNGeneration.Parsing
+                  , RNGeneration.Types
+                  , RNGeneration.Util
   hs-source-dirs:   src
   build-depends:    base >=4.7 && <5
+                  , aeson
+                  , hashable
+                  , text
+                  , transformers
+                  , unordered-containers
   default-language: Haskell2010
+  default-extensions: OverloadedStrings
+                    , LambdaCase
+                    , RecordWildCards
 
 executable rngeneration-exe
   main-is:          Main.hs
