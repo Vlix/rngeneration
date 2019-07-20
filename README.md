@@ -8,7 +8,7 @@ What we need to generate randomized items/locations/connectors/etc:
 	* implement as one-way
 	* two-way might be shortcut for 2 Connectors
 * Connectors have Requirements
-* Requirements are sets of Collectables (and Settings)
+* Requirements are sets of Collectables (and Options)
 	* Requirements should be composable for convenience
 * Collectables can be of a certain type
 * Areas can have Collectables (skills/items)
@@ -23,8 +23,8 @@ What we need to generate randomized items/locations/connectors/etc:
 * "Item Location with Requirement":
 	* "Area with Collectable where Connector has the Requirement"
 
-* Settings are a thing
-	* Settings can be defined in terms of Collectables
+* Options are a thing
+	* Options can be defined in terms of Collectables
 	  (These are set outside of any Area: i.e. "runtime")
 
 ## Maybe required?
@@ -55,15 +55,15 @@ The Area "connects" to other Areas and "has" Item Locations
 because it is conceptually easier to split the kind of Areas.
 
 
-```
-- type: area
-  name: "Area Name"
-  connects:
-    "Other Area": [reqs]
-    "Another Area": [reqs]
-  has:
-    "Item Location": [reqs]
-    "Another Item": [reqs]
+```yaml
+type: area
+name: "Area Name"
+connects:
+  "Other Area": [reqs]
+  "Another Area": [reqs]
+has:
+  "Item Location": [reqs]
+  "Another Item": [reqs]
 ```
 
 ## Item Location
@@ -79,10 +79,18 @@ in the Temple of Time)
 An Item Location has a name for debugging and logging's
 sake, and it "holds" a certain "Item" when not randomized.
 
+```json
+{
+  "type": "item",
+  "name": "Boss Reward",
+  "holds": "Heart Container"
+}
 ```
-- type: item
-  name: "Boss Reward"
-  holds: "Item #1"
+
+```yaml
+type: item
+name: "Boss Reward"
+holds: "Heart Container"
 ```
 
 ## Requirement
@@ -92,14 +100,17 @@ access to an Area or Item. Though, technically,
 it bars access through the connector of the area,
 since connectors could also be randomized
 
+(`REQ` is used here as any one of: Item name,
+Option or defined Requirement)
+
 It can either be:
 
 - `null`: no requirements
-- a boolean (`true`/`false`)
+- a `boolean`:
     - `true`: no requirements
     - `false`: impossible
-- an Item name (`string`)
-- a list of Item names (`array`)
+- a `string`: a `REQ`
+- an `array`: a list of `REQ`'s
     - empty array: no requirements
 - an OR `object`: `{"this": --req--, "or": --req--}`
 - an AND `object`: `{"this": --req--, "and": --req--}`
@@ -119,26 +130,34 @@ of items, for example.
   "type": "area",
   "name": "Kakariko Village",
   "connects": {
-    "Hyrule Field": null
+    "Hyrule Field": null,
+    "Graveyard": null,
+    "Death Mountain Trail": null,
+    "Windmill": null,
+    "Bottom of the Well": [
+        "Song of Storms",
+        "Ocarina"
+      ]
     }
   },
   "has": {
     "Rooftop Man": {
       "this": "Epic Side Hops",
       "or": ["Adult Link", "Hookshot"]
-    }
+    },
+    "Cuccoo Quest": null
   }
 }
 ```
 
 ```yaml
-- type: area
-  name: Kakariko Village
-  connects:
-    "Hyrule Field": []
-  has:
-    "Rooftop Man":
-      this: "Epic Side Hops"
-      or: - "Adult Link"
-          - "Hookshot"
+type: area
+name: Kakariko Village
+connects:
+  "Hyrule Field": []
+has:
+  "Rooftop Man":
+    this: "Epic Side Hops"
+    or: - "Adult Link"
+        - "Hookshot"
 ```
