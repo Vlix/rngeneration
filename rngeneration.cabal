@@ -21,6 +21,7 @@ source-repository head
 library
   exposed-modules:  RNGeneration
   other-modules:    RNGeneration.Parsing
+                  , RNGeneration.Parsing.Types
                   , RNGeneration.Types
                   , RNGeneration.Util
   hs-source-dirs:   src
