@@ -86,7 +86,7 @@ orSmush req1 req2 = smushReq' req1 `orSmush` smushReq' req2
 -- * If adding a Connector to an Area that is already
 --   in the ConnectorMap, this combines the requirements with :|| (OR)
 -- * Otherwise, this just adds the Connector to the ConnectorMap
-addConnector :: Connector -> Area -> Either Text Area
+addConnector :: Connector AreaName -> Area -> Either Text Area
 addConnector c a = do
     mp <- case contains a of
             Item{} -> Left $ aName <> ": holds an item, can't add connector"
@@ -101,7 +101,7 @@ addConnector c a = do
 -- | Adds a connector to an Area
 -- NOTE: Does not check for duplicates (cf. 'addConnector')
 --       and overwrites an Item.
-addConnectorUnsafe :: Connector -> Area -> Area
+addConnectorUnsafe :: Connector AreaName -> Area -> Area
 addConnectorUnsafe c a = a{contains = newConnector}
   where newConnector = case contains a of
             Item{} -> Connect $ HM.singleton cName c

@@ -15,15 +15,19 @@ import qualified Data.HashSet as HS
 import Data.Text (Text)
 
 
-data AreaTree = TreeItem AreaName Collectable
-              | TreeArea AreaName
-
-type TreeMap = HashMap AreaName TreeConnector
-
-data TreeConnector = TreeConnector {
-  tcLeadsTo :: AreaTree,
-  tcRequirements :: Requirement
+data AreaTree = AreaTree {
+  treeSize :: Int, -- ^ Size of the tree
+  treeName :: AreaName, -- ^ Name of the branch
+  treeContents :: ItemOrConnect AreaTree -- ^ Contents of the tree
 }
+
+itemBranch :: AreaName -> Collectable -> AreaTree
+itemBranch an col = AreaTree 1 an $ Item col
+
+connBranch :: AreaName -> ConnectorMap AreaTree -> AreaTree
+connBranch an mp = AreaTree i an $ Connect mp
+  where i = HM.foldl' go 1 mp
+        go a v = a + (treeSize . leadsTo) v
 
 --------
 -- An Area either connects to other areas
@@ -34,7 +38,7 @@ data TreeConnector = TreeConnector {
 -- or it contains an item.
 data Area = Area {
   areaName :: AreaName,
-  contains :: ItemOrConnect
+  contains :: ItemOrConnect AreaName
 }
 
 instance FromJSON Area where
@@ -51,15 +55,15 @@ instance FromJSON Area where
             return Area{..}
         wat -> fail $ "Unrecognized \"type\" field: " <> wat
 
-data ItemOrConnect = Item Collectable
-                   | Connect ConnectorMap
+data ItemOrConnect a = Item Collectable
+                     | Connect (ConnectorMap a)
 
 -- | A collection of Connectors to a certain Area
-type ConnectorMap = HashMap AreaName Connector
+type ConnectorMap a = HashMap AreaName (Connector a)
 
 -- | A connector links areas with optional requirements
-data Connector = Connector {
-  leadsTo :: AreaName,
+data Connector a = Connector {
+  leadsTo :: a,
   requirements :: Requirement
 }
 
