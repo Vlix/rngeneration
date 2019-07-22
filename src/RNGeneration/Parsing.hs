@@ -54,11 +54,13 @@ printErrors ps = do
         printAll xs f = forM_ (zip [1..] xs) $ \(i, x) ->
             printInfo $ show (i :: Int) <> ": " <> f x
 
-mkParseState :: [SettingPart] -> State ParseState ()
-mkParseState = mapM_ $ \case
-    AreaPart a -> parseArea a
-    ReqPart nr -> parseReq nr
-    OptionPart opt -> parseOption opt
+mkParseState :: [SettingPart] -> ParseState
+mkParseState = flip execState mempty . go
+  where go = mapM_ $ \case
+            AreaPart a -> parseArea a
+            ReqPart nr -> parseReq nr
+            OptionPart opt -> parseOption opt
+            Start start -> parseStart start
 
 parseArea :: Area -> State ParseState ()
 parseArea area@(Area name _itemConnect) = do
@@ -83,6 +85,9 @@ parseOption opt = do
     unless duplicate $ do
         modifying encounteredOptions $ HS.insert opt
         modifying (parseResult . parsedOptions) $ (:) opt
+
+parseStart :: AreaName -> State ParseState ()
+parseStart = modifying (parseResult . parsedStart) . (:)
 
 isDuplicate :: (MonadState s m, Eq a, Hashable a)
             => a

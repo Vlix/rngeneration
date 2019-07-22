@@ -11,7 +11,8 @@ import Data.Text (Text)
 import RNGeneration.Types
 
 
-data SettingPart = AreaPart Area
+data SettingPart = Start AreaName
+                 | AreaPart Area
                  | ReqPart NamedRequirement
                  | OptionPart Option
 
@@ -19,6 +20,7 @@ instance FromJSON SettingPart where
   parseJSON = withObject "SettingPart" $ \o ->
       AreaPart <$> parseJSON (Object o)
     <|> ReqPart <$> parseJSON (Object o)
+    <|> Start <$> o .: "start"
     <|> parseOption o
     where parseOption o = do
             typ <- o .: "type"
@@ -40,6 +42,7 @@ data ParseReport = ParseReport {
 makeLenses ''ParseReport
 
 data ParseResult = ParseResult {
+  _parsedStart :: [AreaName],
   _parsedAreas :: [Area],
   _parsedReqs :: [NamedRequirement],
   _parsedOptions :: [Option]
@@ -64,6 +67,7 @@ makeLenses ''ParseState
 
 instance Semigroup ParseResult where
    pr1 <> pr2 = ParseResult {
+      _parsedStart = _parsedStart pr1 <> _parsedStart pr2,
       _parsedAreas = _parsedAreas pr1 <> _parsedAreas pr2,
       _parsedReqs = _parsedReqs pr1 <> _parsedReqs pr2,
       _parsedOptions = _parsedOptions pr1 <> _parsedOptions pr2
@@ -94,7 +98,7 @@ instance Semigroup ParseState where
 --------- MONOIDS ---------
 
 instance Monoid ParseResult where
-  mempty = ParseResult mempty mempty mempty
+  mempty = ParseResult mempty mempty mempty mempty
 
 instance Monoid ParseReport where
   mempty = ParseReport mempty mempty mempty mempty

@@ -44,6 +44,20 @@ What we need to generate randomized items/locations/connectors/etc:
 
 # JSON formats
 
+## Start
+
+The start object indicates which Area is the starting area.
+
+```json
+{
+  "start" : "Area name"
+}
+```
+
+```yaml
+- start: "Area name"
+```
+
 ## Area with connectors
 
 Any logically enclosed region is considered an "Area".
