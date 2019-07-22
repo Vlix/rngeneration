@@ -1,16 +1,20 @@
 module RNGeneration.Parsing where
 
 
+import Control.Arrow (left)
 import Control.Exception (SomeException, catch)
 import Control.Lens
 import Control.Monad (forM_, unless, when)
 import Control.Monad.State (MonadState, lift)
-import Control.Monad.Trans.Except
+import Control.Monad.Trans.Except hiding (catchE)
 import Control.Monad.Trans.State
 import Data.Aeson
+import Data.Aeson.Internal (formatError)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
-import Data.Text (unpack)
+import Data.Text (intercalate, unpack)
+import Data.Yaml
+import Data.Yaml.Internal
 
 import RNGeneration.Types
 import RNGeneration.Parsing.Types
@@ -18,12 +22,35 @@ import RNGeneration.Parsing.Types
 
 parseJSONFile :: FilePath -> IO (Either String ParseResult)
 parseJSONFile fp = runExceptT $ do
-    result <- ExceptT $ eitherDecodeFileStrict' fp `catch` \e ->
-                            return . Left $ show (e :: SomeException)
-    let (_, ps) = runState (mkParseState result) mempty
-    if noDuplicates ps
-      then return $ ps ^. parseResult
-      else printErrors ps
+    result <- catchE $ eitherDecodeFileStrict' fp
+    handleParseState $ mkParseState result
+
+parseYAMLFile :: FilePath -> IO (Either String ParseResult)
+parseYAMLFile fp = runExceptT $ do
+    (warnings, result) <- catchE $ left show <$> decodeFileWithWarnings fp
+    ps <- if not $ null warnings
+              then formatWarnings warnings
+              else return $ mkParseState result
+    handleParseState ps
+
+catchE :: IO (Either String a) -> ExceptT String IO a
+catchE f = ExceptT $ f `catch` \e -> return . Left $ show (e :: SomeException)
+
+formatWarnings :: Monad m => [Warning] -> ExceptT String m a
+formatWarnings = throwE . unlines . fmap go
+  where go (DuplicateKey path) = formatError path "Duplicate key found"
+
+
+handleParseState :: ParseState -> ExceptT String IO ParseResult
+handleParseState ps
+  | not $ noDuplicates ps = printErrors ps
+  | otherwise = do
+      let starts = ps ^. parseResult . parsedStart
+          len = length starts
+          msg = "More than one Start found: " <>
+                    intercalate ", " (getAreaName <$> starts)
+      when (len == 1) $ throwE $ unpack msg
+      return $ ps ^. parseResult
 
 noDuplicates :: ParseState -> Bool
 noDuplicates ps = ps ^. duplicateAreas   == []
