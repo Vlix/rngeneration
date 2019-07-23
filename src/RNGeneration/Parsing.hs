@@ -12,7 +12,7 @@ import Data.Aeson
 import Data.Aeson.Internal (formatError)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
-import Data.Text (intercalate, unpack)
+import Data.Text (Text, intercalate, unpack)
 import Data.Yaml
 import Data.Yaml.Internal
 
@@ -89,7 +89,7 @@ mkParseState = flip execState mempty . go
             OptionPart opt -> parseOption opt
             Start start -> parseStart start
 
-parseArea :: Area -> State ParseState ()
+parseArea :: Area Text -> State ParseState ()
 parseArea area@(Area name _itemConnect) = do
     duplicate <- name `isDuplicate` encounteredAreas
     when duplicate $ modifying duplicateAreas $ (:) name
@@ -97,7 +97,7 @@ parseArea area@(Area name _itemConnect) = do
         modifying encounteredAreas $ HS.insert name
         modifying (parseResult . parsedAreas) $ (:) area
 
-parseReq :: NamedRequirement -> State ParseState ()
+parseReq :: NamedRequirement Text -> State ParseState ()
 parseReq nr@(NamedReq name _) = do
     duplicate <- name `isDuplicate` encounteredReqs
     when duplicate $ modifying duplicateReqs $ (:) nr

@@ -12,8 +12,8 @@ import RNGeneration.Types
 
 
 data SettingPart = Start AreaName
-                 | AreaPart Area
-                 | ReqPart NamedRequirement
+                 | AreaPart (Area Text)
+                 | ReqPart (NamedRequirement Text)
                  | OptionPart Option
 
 instance FromJSON SettingPart where
@@ -27,24 +27,24 @@ instance FromJSON SettingPart where
             case typ of
               "option" -> OptionPart <$> o .: "name"
               wat -> fail $ "Unrecognized \"type\" field: " <> wat
-
+{-
 data AllReqs = ReqItem Collectable
              | ReqReq Text
              | ReqOption Option
-
+-}
 
 data ParseReport = ParseReport {
-  _nonExistentAreas :: [AreaName],   -- ^ Area names used, but not defined
-  _nonExistentReqs :: [Text],        -- ^ Reqs used, but not defined (Req = Item/Option/Req)
-  _unusedReqs :: [NamedRequirement], -- ^ Reqs defined, but not used
-  _unusedOptions :: [Option]         -- ^ Option defined, but not used
+  _nonExistentAreas :: [AreaName], -- ^ Area names used, but not defined
+  _nonExistentReqs :: [Text],      -- ^ Reqs used, but not defined (Req = Item/Option/Req)
+  _unusedReqs :: [NamedRequirement Text], -- ^ Reqs defined, but not used
+  _unusedOptions :: [Option]       -- ^ Option defined, but not used
 }
 makeLenses ''ParseReport
 
 data ParseResult = ParseResult {
   _parsedStart :: [AreaName],
-  _parsedAreas :: [Area],
-  _parsedReqs :: [NamedRequirement],
+  _parsedAreas :: [Area Text],
+  _parsedReqs :: [NamedRequirement Text],
   _parsedOptions :: [Option]
 }
 makeLenses ''ParseResult
@@ -53,7 +53,7 @@ data ParseState = ParseState {
   _encounteredAreas :: HashSet AreaName, -- ^ Used in parsing to check duplicates
   _duplicateAreas   :: [AreaName],       -- ^ Areas defined more than once
   _encounteredReqs :: HashSet Text,      -- ^ Used in parsing to check duplicates
-  _duplicateReqs :: [NamedRequirement],  -- ^ Reqs defined more than once
+  _duplicateReqs :: [NamedRequirement Text], -- ^ Reqs defined more than once
   _encounteredOptions :: HashSet Option, -- ^ Used in parsing to check duplicates
   _duplicateOptions :: [Option],         -- ^ Options defined more than once
   _parseResult :: ParseResult

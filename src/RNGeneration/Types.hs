@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 module RNGeneration.Types where
@@ -7,27 +8,25 @@ module RNGeneration.Types where
 import Control.Applicative ((<|>))
 import Control.Monad (when)
 import Data.Aeson
+import Data.Aeson.Types (Parser)
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Data.Text (Text)
+import Data.Text (Text, intercalate)
 
 
-data AreaTree = AreaTree {
-  treeSize :: Int, -- ^ Size of the tree
+data AreaTree a = AreaTree {
   treeName :: AreaName, -- ^ Name of the branch
-  treeContents :: ItemOrConnect AreaTree -- ^ Contents of the tree
+  treeContents :: ItemOrConnect (AreaTree a) a -- ^ Contents of the tree
 }
 
-itemBranch :: AreaName -> Collectable -> AreaTree
-itemBranch an col = AreaTree 1 an $ Item col
+itemBranch :: AreaName -> Collectable -> AreaTree a
+itemBranch an col = AreaTree an $ Item col
 
-connBranch :: AreaName -> ConnectorMap AreaTree -> AreaTree
-connBranch an mp = AreaTree i an $ Connect mp
-  where i = HM.foldl' go 1 mp
-        go a v = a + (treeSize . leadsTo) v
+connBranch :: AreaName -> ConnectorMap (AreaTree a) a -> AreaTree a
+connBranch an mp = AreaTree an $ Connect mp
 
 --------
 -- An Area either connects to other areas
@@ -36,12 +35,12 @@ connBranch an mp = AreaTree i an $ Connect mp
 
 -- | This is any area that connects other areas
 -- or it contains an item.
-data Area = Area {
+data Area a = Area {
   areaName :: AreaName,
-  contains :: ItemOrConnect AreaName
+  contains :: ItemOrConnect AreaName a
 }
 
-instance FromJSON Area where
+instance FromJSON (Area Text) where
   parseJSON = withObject "Area" $ \o -> do
       typ <- o .: "type"
       areaName <- o .: "name"
@@ -55,16 +54,16 @@ instance FromJSON Area where
             return Area{..}
         wat -> fail $ "Unrecognized \"type\" field: " <> wat
 
-data ItemOrConnect a = Item Collectable
-                     | Connect (ConnectorMap a)
+data ItemOrConnect a b = Item Collectable
+                       | Connect (ConnectorMap a b)
 
 -- | A collection of Connectors to a certain Area
-type ConnectorMap a = HashMap AreaName (Connector a)
+type ConnectorMap a b = HashMap AreaName (Connector a b)
 
 -- | A connector links areas with optional requirements
-data Connector a = Connector {
+data Connector a b = Connector {
   leadsTo :: a,
-  requirements :: Requirement
+  requirements :: Requirement b
 }
 
 newtype AreaName = AreaName { getAreaName :: Text }
@@ -85,10 +84,12 @@ newtype Option = Option {
 } deriving (FromJSON, Hashable)
   deriving newtype (Eq, Show, Ord)
 
+-- TODO: Needs verification function after parsing of
+-- 'NamedRequirement Text'. Should error on circular dependencies.
+data NamedRequirement a = NamedReq Text (Requirement a)
 
-data NamedRequirement = NamedReq Text Requirement
 
-instance FromJSON NamedRequirement where
+instance FromJSON (NamedRequirement Text) where
   parseJSON = withObject "Requirement Definition" $ \o -> do
     typ <- o .: "type"
     case typ of
@@ -100,12 +101,12 @@ instance FromJSON NamedRequirement where
 
 -- | Requirements are defined by a set of collectables
 -- or a con-/disjuction of such sets
-data Requirement = Req (HashSet Text) -- ^ any Item/Option/NamedRequirement name
-                 | Requirement :|| Requirement
-                 | Requirement :&& Requirement
-                 | IMPOSSIBLE
+data Requirement a = Req (HashSet a) -- ^ any Item/Option/NamedRequirement name
+                   | Requirement a :|| Requirement a
+                   | Requirement a :&& Requirement a
+                   | IMPOSSIBLE
 
-instance FromJSON Requirement where
+instance FromJSON (Requirement Text) where
   parseJSON Null = pure $ Req mempty
   parseJSON (Number n) = fail $ "Requirement can't be a number: " <> show n
   parseJSON (String txt) = pure . Req $ HS.singleton txt
@@ -123,6 +124,7 @@ instance FromJSON Requirement where
               let (c:cs) = Req . HS.singleton <$> choices
               return $ foldr (:||) c cs
           errMsg = "\"choices\" fields needs an array with at least one value"
+          go :: Object -> Parser (Requirement Text)
           go o = do
             this <- o .: "this"
             mOR <- o .:? "or"

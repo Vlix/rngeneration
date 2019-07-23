@@ -20,12 +20,12 @@ import RNGeneration.Types
 
 -- | A way to remove unnecessary data constructors
 -- and combine HashSets.
-smushReq :: Requirement -> Requirement
+smushReq :: (Hashable a, Eq a) => Requirement a -> Requirement a
 smushReq = rpReq . smushReq' . toFresh
 -- RULE?: toFresh . rpReq == id
 -- RULE?: toTried . rpReq == id
 
-smushReq' :: RequirementPhase -> RequirementPhase
+smushReq' :: (Hashable a, Eq a) => RequirementPhase a -> RequirementPhase a
 smushReq' r@(RP req typ) =
     case typ of
       Tried -> r
@@ -35,21 +35,21 @@ smushReq' r@(RP req typ) =
                 req1 :&& req2 -> toFresh req1 `andSmush` toFresh req2
                 req1 :|| req2 -> toFresh req1 `orSmush` toFresh req2
 
-data RequirementPhase = RP {
-  rpReq :: Requirement,
+data RequirementPhase a = RP {
+  rpReq :: Requirement a,
   rpType :: RequirementType
 }
 
 data RequirementType = Fresh | Tried
   deriving (Eq, Show)
 
-toFresh :: Requirement -> RequirementPhase
+toFresh :: Requirement a -> RequirementPhase a
 toFresh r = RP r Fresh
 
-toTried :: Requirement -> RequirementPhase
+toTried :: Requirement a -> RequirementPhase a
 toTried r = RP r Tried
 
-andSmush :: RequirementPhase -> RequirementPhase -> RequirementPhase
+andSmush :: (Hashable a, Eq a) => RequirementPhase a -> RequirementPhase a -> RequirementPhase a
 andSmush req1@(RP r1' Tried) req2@(RP r2' Tried) =
   case (r1', r2') of
     (IMPOSSIBLE, _) -> toTried IMPOSSIBLE
@@ -63,7 +63,7 @@ andSmush req1@(RP r1' Tried) req2@(RP r2' Tried) =
 andSmush req1 req2 =
     smushReq' req1 `andSmush` smushReq' req2
 
-orSmush :: RequirementPhase -> RequirementPhase -> RequirementPhase
+orSmush :: (Hashable a, Eq a) => RequirementPhase a -> RequirementPhase a -> RequirementPhase a
 orSmush (RP r1' Tried) (RP r2' Tried) =
   case (r1', r2') of
     (IMPOSSIBLE, r) -> toTried r
@@ -86,7 +86,7 @@ orSmush req1 req2 = smushReq' req1 `orSmush` smushReq' req2
 -- * If adding a Connector to an Area that is already
 --   in the ConnectorMap, this combines the requirements with :|| (OR)
 -- * Otherwise, this just adds the Connector to the ConnectorMap
-addConnector :: Connector AreaName -> Area -> Either Text Area
+addConnector :: (Hashable a, Eq a) => Connector AreaName a -> Area a -> Either Text (Area a)
 addConnector c a = do
     mp <- case contains a of
             Item{} -> Left $ aName <> ": holds an item, can't add connector"
@@ -101,7 +101,7 @@ addConnector c a = do
 -- | Adds a connector to an Area
 -- NOTE: Does not check for duplicates (cf. 'addConnector')
 --       and overwrites an Item.
-addConnectorUnsafe :: Connector AreaName -> Area -> Area
+addConnectorUnsafe :: (Hashable a, Eq a) => Connector AreaName a -> Area a -> Area a
 addConnectorUnsafe c a = a{contains = newConnector}
   where newConnector = case contains a of
             Item{} -> Connect $ HM.singleton cName c
@@ -110,7 +110,7 @@ addConnectorUnsafe c a = a{contains = newConnector}
 
 
 -- | Connect first Area to second Area
-connectsTo :: Area -> Area -> Either Text Area
+connectsTo :: (Hashable a, Eq a) => Area a -> Area a -> Either Text (Area a)
 connectsTo from to =
     addConnector (Connector aName $ Req mempty) from
   where aName = areaName to
