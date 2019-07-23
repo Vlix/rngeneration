@@ -47,15 +47,15 @@ handleParseState ps
   | otherwise = do
       let starts = ps ^. parseResult . parsedStart
           len = length starts
-          msg = "More than one Start found: " <>
+          msg = "More than one Start found. Found names: " <>
                     intercalate ", " (getAreaName <$> starts)
       when (len == 1) $ throwE $ unpack msg
       return $ ps ^. parseResult
 
 noDuplicates :: ParseState -> Bool
-noDuplicates ps = ps ^. duplicateAreas   == []
+noDuplicates ps = null (ps ^. duplicateAreas)
                && null (ps ^. duplicateReqs)
-               && ps ^. duplicateOptions == []
+               && null (ps ^. duplicateOptions)
 
 printErrors :: ParseState -> ExceptT String IO a
 printErrors ps = do
