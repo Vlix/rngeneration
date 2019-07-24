@@ -60,6 +60,11 @@ data ItemOrConnect a b = Item Collectable
 -- | A collection of Connectors to a certain Area
 type ConnectorMap a b = HashMap AreaName (Connector a b)
 
+-- TODO: Connectors probably need IDs as well, for
+-- the developers to know which connector is which
+-- (in case of entrance shuffle)
+-- TODO: Also needs a setting to tell if this connector
+-- __CAN/SHOULD__ be randomized or not.
 -- | A connector links areas with optional requirements
 data Connector a b = Connector {
   leadsTo :: a,
@@ -87,6 +92,27 @@ newtype Option = Option {
 -- TODO: Needs verification function after parsing of
 -- 'NamedRequirement Text'. Should error on circular dependencies.
 data NamedRequirement a = NamedReq Text (Requirement a)
+
+-- FIXME: Use a tagged 'NamedRequirement ReqType' to ignore
+-- anything that isn't a predefined requirement!
+-- TODO: Good idea to add some unit tests for this to check
+-- it actually catches circular dependencies.
+checkDeps :: HashMap Text (NamedRequirement Text)
+          -> NamedRequirement Text
+          -> Either [Text] ()
+checkDeps reqMap (NamedReq txt req) = go [txt] (HS.singleton txt) req
+  where go acc s = \case
+            Req reqSet
+              | clash <- s `HS.intersection` reqSet
+              , clash /= mempty ->
+                  let clashes = intercalate ", " $ HS.toList clash
+                  in Left $ "(" <> clashes <> ")" : acc
+              | otherwise ->
+                  let noClash = s `HS.intersection` reqSet
+                  in undefined -- FIXME: look up named reqs and continue down
+            r1 :|| r2 -> (<>) <$> go acc s r1 <*> go acc s r2
+            r1 :&& r2 -> (<>) <$> go acc s r1 <*> go acc s r2
+            _ -> Right ()
 
 
 instance FromJSON (NamedRequirement Text) where

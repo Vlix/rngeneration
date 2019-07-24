@@ -1,3 +1,5 @@
 module RNGeneration where
 
--- cleanup :: Setting -> Setting
+-- cleanup :: ParseResult -> ParseResult
+
+-- resultToSettings :: ParseResult -> Maybe Settings
