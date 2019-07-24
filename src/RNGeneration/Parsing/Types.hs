@@ -5,10 +5,56 @@ module RNGeneration.Parsing.Types where
 import Control.Applicative ((<|>))
 import Control.Lens (makeLenses)
 import Data.Aeson
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.Text (Text)
 
 import RNGeneration.Types
+
+
+-- | Cleaned up Settings after parsing (from ParseResult)
+data Settings a = Settings {
+  startArea  :: AreaName,              -- ^ Area to begin
+  areaMap    :: HashMap AreaName (Area a), -- ^ All Areas (Map)
+  allAreas   :: HashSet AreaName,      -- ^ All Areas (Set)
+  allItemLocations :: HashSet AreaName, -- ^ All Areas with 'Item'
+  allCollectables :: AllCollectables,
+  -- ^ All Collectables.
+  -- N.B. MVP uses the collectables defined in Areas and reshuffles.
+  -- Later, the items and their amounts might be altered with extra
+  -- settings or maybe also at runtime.
+  reqMap     :: ReqMap a,              -- ^ Map of pre-defined requirements
+  allOptions :: AllOptions             -- ^ All known Options
+
+  -- N.B. Not sure about the following fields,
+  -- but something like these should be somewhere.
+  -- Probably runtime tracking types.
+
+  -- configuredOptions :: HashSet Option -- ^ Flagged runtime options (add at runtime)
+  -- positiveReqs :: HashSet Text -- ^ All Collectables or Options that resolve to TRUE (probably runtime as well)
+  -- openItemLocations :: HashSet AreaName
+  -- -- ^ Used for placing random items. Remove AreaName after placing,
+  -- -- and add new AreaNames when new ones open up.
+}
+
+type ReqMap a = HashMap Text (NamedRequirement a)
+type AllOptions = HashSet Option
+type AllCollectables = HashSet Collectable
+
+findClashingNames :: ReqMap Text -> AllCollectables -> AllOptions -> HashSet Text
+findClashingNames reqMap collSet' optSet' =
+    (optSet `HS.intersection` collSet)
+      `HS.union`
+    (optSet `HS.intersection` reqSet)
+      `HS.union`
+    (collSet `HS.intersection` reqSet)
+  where reqSet = HS.fromMap $ HM.map (const ()) reqMap
+        collSet = HS.map collectableName collSet'
+        optSet = HS.map optionName optSet'
+
+-- knownRef :: Text ->
 
 
 data SettingPart = Start AreaName
