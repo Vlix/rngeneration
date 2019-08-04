@@ -1,0 +1,5 @@
+choice:
+  - "A"
+  - false
+  - - "B"
+    - "C"

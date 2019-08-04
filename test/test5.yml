@@ -1,0 +1,9 @@
+this:
+  - "A"
+  - false
+  - this: "B"
+    or: "C"
+and:
+  choice:
+    - "D"
+    - "E"
