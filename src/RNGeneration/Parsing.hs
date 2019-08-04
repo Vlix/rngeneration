@@ -49,7 +49,7 @@ handleParseState ps
           len = length starts
           msg = "More than one Start found. Found names: " <>
                     intercalate ", " (getAreaName <$> starts)
-      when (len == 1) $ throwE $ unpack msg
+      when (len /= 1) $ throwE $ unpack msg
       return $ ps ^. parseResult
 
 noDuplicates :: ParseState -> Bool
