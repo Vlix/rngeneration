@@ -43,16 +43,17 @@ type ReqMap a = HashMap Text (NamedRequirement a)
 type AllOptions = HashSet Option
 type AllCollectables = HashSet Collectable
 
-findClashingNames :: ReqMap Text -> AllCollectables -> AllOptions -> HashSet Text
+findClashingNames :: ReqMap Text -> AllCollectables -> AllOptions -> [Text]
 findClashingNames reqMap collSet' optSet' =
-    (optSet `HS.intersection` collSet)
-      `HS.union`
-    (optSet `HS.intersection` reqSet)
-      `HS.union`
-    (collSet `HS.intersection` reqSet)
+    optColl <> optReq <> collReq
   where reqSet = HS.fromMap $ HM.map (const ()) reqMap
         collSet = HS.map collectableName collSet'
         optSet = HS.map optionName optSet'
+        optColl = foldIt "Collectable/Option: " $ optSet `HS.intersection` collSet
+        optReq = foldIt "Requirement/Option: " $ optSet `HS.intersection` reqSet
+        collReq = foldIt "Collectable/Requirement: " $ collSet `HS.intersection` reqSet
+        foldIt t = HS.foldl' go []
+          where go acc el = (mappend t) el : acc
 
 -- knownRef :: Text ->
 
