@@ -4,7 +4,7 @@ module RNGeneration.Parsing where
 import Control.Arrow (left)
 import Control.Exception (SomeException, catch)
 import Control.Lens
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM_, when)
 import Control.Monad.State (MonadState, lift)
 import Control.Monad.Trans.Except hiding (catchE)
 import Control.Monad.Trans.State
@@ -92,24 +92,24 @@ mkParseState = flip execState mempty . go
 parseArea :: Area Text -> State ParseState ()
 parseArea area@(Area name _itemConnect) = do
     duplicate <- name `isDuplicate` encounteredAreas
-    when duplicate $ modifying duplicateAreas $ (:) name
-    unless duplicate $ do
+    if duplicate then modifying duplicateAreas $ (:) name
+      else do
         modifying encounteredAreas $ HS.insert name
         modifying (parseResult . parsedAreas) $ (:) area
 
 parseReq :: NamedRequirement Text -> State ParseState ()
 parseReq nr@(NamedReq name _) = do
     duplicate <- name `isDuplicate` encounteredReqs
-    when duplicate $ modifying duplicateReqs $ (:) nr
-    unless duplicate $ do
+    if duplicate then modifying duplicateReqs $ (:) nr
+      else do
         modifying encounteredReqs $ HS.insert name
         modifying (parseResult . parsedReqs) $ (:) nr
 
 parseOption :: Option -> State ParseState ()
 parseOption opt = do
     duplicate <- opt `isDuplicate` encounteredOptions
-    when duplicate $ modifying duplicateOptions $ (:) opt
-    unless duplicate $ do
+    if duplicate then modifying duplicateOptions $ (:) opt
+      else do
         modifying encounteredOptions $ HS.insert opt
         modifying (parseResult . parsedOptions) $ (:) opt
 
