@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -51,22 +50,25 @@ andSmush req1 req2 =
 
     -- Combining two ANDs that have regular Reqs can just be
     -- combined. Next 'andSmush' will clean this up further.
-    (Req r1 :&& r2 , Req r3 :&& r4) ->
+    (Req r1 :&& r2 , r3) -> intersectAND r1 r2 r3
+    -- Keep anything with an intersection on the left side
+    (_, Req{} :&& _) -> req2 `andSmush` req1
+
+    -- Anything else could not be reduced any further
+    (r1, r2) -> r1 :&& r2
+
+intersectAND :: (Hashable a, Eq a) => HashSet a -> Requirement a -> Requirement a -> Requirement a
+intersectAND r1 r2 req = case req of
+    Req r3 :&& r4 ->
         -- We use :&& instead of 'andSmush' here,
         -- because we don't want this to go through reqAND again.
         combineEmpties $ Req (r1 <> r3) :&&
           -- Seeing as r2 already has r1 removed, just remove r3.
           -- Conversely do the same with r4.
           (combineEmpties $ removeReqs r3 r2 :&& removeReqs r1 r4)
-    -- combine r2/r3/r4 (r2 is also :||)
-    (Req r1 :&& r2, r3 :|| r4) -> undefined -- FIXME: combine ANDs
-    -- Keep anything with an intersection on the left side
-    (_, Req{} :&& _) -> req2 `andSmush` req1
-
-    -- These OR combinations
-    (r1 :|| r2, r3 :|| r4) -> undefined -- FIXME: combine ORs
-    -- Anything else can't be further reduced.
-    (r1, r2) -> r1 :&& r2
+    -- Should never happen on IMPOSSIBLE or Req
+    -- and can be done on :&& and :||
+    _ -> combineEmpties $ (Req r1 :&& r2) :&& removeReqs r1 req
 
 -- | Combine a requirement set with other requirements
 reqAND :: (Hashable a, Eq a) => HashSet a -> HashSet a -> Requirement a -> Requirement a
@@ -105,19 +107,14 @@ removeReqs s x = case x of
 
 -- | Combines compounds in case empty sets show up.
 combineEmpties :: Requirement a -> Requirement a
-combineEmpties !x = case x of
-    Req r1 :&& r2 | HS.null r1 -> r2
+combineEmpties x = case x of
     r1 :&& Req r2 | HS.null r2 -> r1
-    Req r1 :|| _  | HS.null r1 -> Req HS.empty
+    Req r1 :&& r2 | HS.null r1 -> r2
     _ :|| Req r2  | HS.null r2 -> Req HS.empty
+    Req r1 :|| _  | HS.null r1 -> Req HS.empty
     req -> req
 
-{-
--- | Only returns True on empty Req set
-unsafeNull :: Requirement a -> Bool
-unsafeNull (Req a) = HS.null a
-unsafeNull _ = False
--}
+
 
 -- Anything combined with OR needs to also be reduced.
 orSmush :: (Hashable a, Eq a) => Requirement a -> Requirement a -> Requirement a
@@ -126,22 +123,29 @@ orSmush req1 req2 =
     -- IMPOSSIBLE on either side can be removed
     (IMPOSSIBLE, r) -> r
     (r, IMPOSSIBLE) -> r
+
+    -- Combine regular requirements with 'reqOR'
     (Req r1, r2) -> reqOR r1 r2
     (_     , Req{}) -> req2 `orSmush` req1
-    -- FIXME: What do with intersections? (Req r1 :&& r2)
+
+    -- Handle intersections with 'intersectOR'
+    (Req r1 :&& r2, r3) -> intersectOR r1 r2 r3
+    (_, Req{} :&& _) -> req2 `orSmush` req1
+
+    -- Anything else could not be reduced any further
     (r1, r2) -> r1 :|| r2
 
 reqOR :: (Hashable a, Eq a) => HashSet a -> Requirement a -> Requirement a
-reqOR r1 = \case
+reqOR r1 req = case req of
     IMPOSSIBLE -> Req r1
     Req r2 -> combineReqsOR r1 r2
-    Req r2 :&& r3 ->
+    Req r2 :&& _ ->
       let isect = r1 `HS.intersection` r2
       in if r1 == isect then Req r1
             else combineEmpties $
               Req isect :&& (combineEmpties $ Req (r1 `HS.difference` isect)
-                                                :|| removeReqs isect (Req r2 :&& r3))
-    -- FIXME: unfinished case
+                                                :|| removeReqs isect req)
+    _ -> Req r1 :|| req
 
 -- | Any requirements that appear on both sides
 -- can be changed to an AND with those requirements.
@@ -152,6 +156,22 @@ combineReqsOR r1 r2
   where isect = r1 `HS.intersection` r2
         req1 = r1 `HS.difference` isect
         req2 = r2 `HS.difference` isect
+
+intersectOR :: (Hashable a, Eq a) => HashSet a -> Requirement a -> Requirement a -> Requirement a
+intersectOR r1 r2 req = case req of
+    Req r3 :&& _ ->
+        let isect = r1 `HS.intersection` r3
+        in if isect == mempty
+              then originalReq
+              else combineEmpties $
+                Req isect :&& (combineEmpties $ removeReqs isect originalReq)
+    _ -> originalReq
+  where originalReq = (Req r1 :&& r2) :|| req
+
+
+
+
+
 
 
 

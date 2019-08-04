@@ -100,7 +100,7 @@ data NamedRequirement a = NamedReq Text (Requirement a)
 checkDeps :: HashMap Text (NamedRequirement Text)
           -> NamedRequirement Text
           -> Either [Text] ()
-checkDeps reqMap (NamedReq txt req) = go [txt] (HS.singleton txt) req
+checkDeps _reqMap (NamedReq txt req) = go [txt] (HS.singleton txt) req
   where go acc s = \case
             Req reqSet
               | clash <- s `HS.intersection` reqSet
@@ -108,7 +108,7 @@ checkDeps reqMap (NamedReq txt req) = go [txt] (HS.singleton txt) req
                   let clashes = intercalate ", " $ HS.toList clash
                   in Left $ "(" <> clashes <> ")" : acc
               | otherwise ->
-                  let noClash = s `HS.intersection` reqSet
+                  let _noClash = s `HS.intersection` reqSet
                   in undefined -- FIXME: look up named reqs and continue down
             r1 :|| r2 -> (<>) <$> go acc s r1 <*> go acc s r2
             r1 :&& r2 -> (<>) <$> go acc s r1 <*> go acc s r2
@@ -131,13 +131,19 @@ data Requirement a = Req (HashSet a) -- ^ any Item/Option/NamedRequirement name
                    | Requirement a :|| Requirement a
                    | Requirement a :&& Requirement a
                    | IMPOSSIBLE
+  deriving (Eq, Show)
 
 instance FromJSON (Requirement Text) where
   parseJSON Null = pure $ Req mempty
   parseJSON (Number n) = fail $ "Requirement can't be a number: " <> show n
   parseJSON (String txt) = pure . Req $ HS.singleton txt
   -- TODO: Might need to check for duplicates, or count them?
-  parseJSON a@Array{} = Req . HS.fromList <$> parseJSON a
+  parseJSON a@Array{} = do
+      adds <- parseJSON a
+      if null adds
+        then pure $ Req mempty
+        else let (x:xs) = adds
+             in pure $ foldl (:&&) (x :: Requirement Text) xs
   parseJSON (Bool b) | b = pure $ Req mempty
                      | otherwise = pure IMPOSSIBLE
   parseJSON val = withObject
@@ -147,8 +153,8 @@ instance FromJSON (Requirement Text) where
     where choice o = do
               choices <- o .: "choice"
               when (null choices) $ fail errMsg
-              let (c:cs) = Req . HS.singleton <$> choices
-              return $ foldr (:||) c cs
+              let (c:cs) = choices
+              return $ foldl (:||) (c :: Requirement Text) cs
           errMsg = "\"choices\" fields needs an array with at least one value"
           go :: Object -> Parser (Requirement Text)
           go o = do
