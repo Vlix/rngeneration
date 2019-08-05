@@ -17,13 +17,13 @@ import Data.Text (Text)
 
 import RNGeneration.Types
 
+-- FIXME: somewhere expand NamedRequirements? (probably after all consistency checks)
 
 -- | A way to remove unnecessary data constructors
 -- and combine HashSets.
 smushReq :: (Hashable a, Eq a) => Requirement a -> Requirement a
 smushReq req = case req of
     -- If it's just regular requirements, we're done.
-    -- FIXME: expand NamedRequirements?
     Req{} -> req
     -- IMPOSSIBLE means just that, we done.
     IMPOSSIBLE -> IMPOSSIBLE

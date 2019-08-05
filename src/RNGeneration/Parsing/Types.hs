@@ -80,13 +80,13 @@ data AllReqs = ReqItem Collectable
              | ReqOption Option
 -}
 
-data ParseReport = ParseReport {
+data ErrorReport = ErrorReport {
   _nonExistentAreas :: [AreaName], -- ^ Area names used, but not defined
   _nonExistentReqs :: [Text],      -- ^ Reqs used, but not defined (Req = Item/Option/Req)
   _unusedReqs :: [NamedRequirement Text], -- ^ Reqs defined, but not used
   _unusedOptions :: [Option]       -- ^ Option defined, but not used
 }
-makeLenses ''ParseReport
+makeLenses ''ErrorReport
 
 data ParseResult = ParseResult {
   _parsedStart :: [AreaName],
@@ -100,7 +100,7 @@ data ParseState = ParseState {
   _encounteredAreas :: HashSet AreaName, -- ^ Used in parsing to check duplicates
   _duplicateAreas   :: [AreaName],       -- ^ Areas defined more than once
   _encounteredReqs :: HashSet Text,      -- ^ Used in parsing to check duplicates
-  _duplicateReqs :: [NamedRequirement Text], -- ^ Reqs defined more than once
+  _duplicateReqs :: [Text],              -- ^ Reqs defined more than once
   _encounteredOptions :: HashSet Option, -- ^ Used in parsing to check duplicates
   _duplicateOptions :: [Option],         -- ^ Options defined more than once
   _parseResult :: ParseResult
@@ -120,8 +120,8 @@ instance Semigroup ParseResult where
       _parsedOptions = _parsedOptions pr1 <> _parsedOptions pr2
     }
 
-instance Semigroup ParseReport where
-  pr1 <> pr2 = ParseReport {
+instance Semigroup ErrorReport where
+  pr1 <> pr2 = ErrorReport {
       _nonExistentAreas = _nonExistentAreas pr1 <> _nonExistentAreas pr2,
       _nonExistentReqs = _nonExistentReqs pr1 <> _nonExistentReqs pr2,
       _unusedReqs = _unusedReqs pr1 <> _unusedReqs pr2,
@@ -147,8 +147,8 @@ instance Semigroup ParseState where
 instance Monoid ParseResult where
   mempty = ParseResult mempty mempty mempty mempty
 
-instance Monoid ParseReport where
-  mempty = ParseReport mempty mempty mempty mempty
+instance Monoid ErrorReport where
+  mempty = ErrorReport mempty mempty mempty mempty
 
 instance Monoid ParseState where
   mempty = ParseState mempty mempty mempty mempty mempty mempty mempty

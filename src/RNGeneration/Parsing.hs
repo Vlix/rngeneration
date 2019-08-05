@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module RNGeneration.Parsing where
 
 
@@ -43,7 +44,7 @@ formatWarnings = throwE . unlines . fmap go
 
 handleParseState :: ParseState -> ExceptT String IO ParseResult
 handleParseState ps
-  | not $ noDuplicates ps = printErrors ps
+  | duplicates ps = printErrors ps
   | otherwise = do
       let starts = ps ^. parseResult . parsedStart
           len = length starts
@@ -52,10 +53,11 @@ handleParseState ps
       when (len /= 1) $ throwE $ unpack msg
       return $ ps ^. parseResult
 
-noDuplicates :: ParseState -> Bool
-noDuplicates ps = null (ps ^. duplicateAreas)
-               && null (ps ^. duplicateReqs)
-               && null (ps ^. duplicateOptions)
+duplicates :: ParseState -> Bool
+duplicates ps = not $
+    null (ps ^. duplicateAreas) &&
+    null (ps ^. duplicateReqs) &&
+    null (ps ^. duplicateOptions)
 
 printErrors :: ParseState -> ExceptT String IO a
 printErrors ps = do
@@ -64,8 +66,7 @@ printErrors ps = do
       printAll as $ unpack . getAreaName
     withDupes duplicateReqs $ \rs -> do
       printErr "Duplicate Requirement names found."
-      let reqName x = let NamedReq name _ = x in name
-      printAll rs $ unpack . reqName
+      printAll rs unpack
     withDupes duplicateOptions $ \os -> do
       printErr "Duplicate Options found."
       printAll os $ unpack . optionName
@@ -89,6 +90,12 @@ mkParseState = flip execState mempty . go
             OptionPart opt -> parseOption opt
             Start start -> parseStart start
 
+modResult :: MonadState ParseState m
+          => ((a -> Identity b) -> ParseResult -> Identity ParseResult)
+          -> (a -> b)
+          -> m ()
+modResult field = modifying (parseResult . field)
+
 parseArea :: Area Text -> State ParseState ()
 parseArea area@(Area name _itemConnect) = do
     duplicate <- name `isDuplicate` encounteredAreas
@@ -100,7 +107,7 @@ parseArea area@(Area name _itemConnect) = do
 parseReq :: NamedRequirement Text -> State ParseState ()
 parseReq nr@(NamedReq name _) = do
     duplicate <- name `isDuplicate` encounteredReqs
-    if duplicate then modifying duplicateReqs $ (:) nr
+    if duplicate then modifying duplicateReqs $ (:) name
       else do
         modifying encounteredReqs $ HS.insert name
         modifying (parseResult . parsedReqs) $ (:) nr
@@ -111,10 +118,10 @@ parseOption opt = do
     if duplicate then modifying duplicateOptions $ (:) opt
       else do
         modifying encounteredOptions $ HS.insert opt
-        modifying (parseResult . parsedOptions) $ (:) opt
+        modResult parsedOptions $ (:) opt
 
 parseStart :: AreaName -> State ParseState ()
-parseStart = modifying (parseResult . parsedStart) . (:)
+parseStart = modResult parsedStart . (:)
 
 isDuplicate :: (MonadState s m, Eq a, Hashable a)
             => a

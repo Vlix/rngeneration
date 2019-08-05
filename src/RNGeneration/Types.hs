@@ -131,7 +131,14 @@ data Requirement a = Req (HashSet a) -- ^ any Item/Option/NamedRequirement name
                    | Requirement a :|| Requirement a
                    | Requirement a :&& Requirement a
                    | IMPOSSIBLE
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show a => Show (Requirement a) where
+  show = \case
+    IMPOSSIBLE -> "IMPOSSIBLE"
+    Req a -> show $ HS.toList a
+    a :&& b -> "(" <> show a <> " AND " <> show b <> ")"
+    a :|| b -> "(" <> show a <> " OR " <> show b <> ")"
 
 instance FromJSON (Requirement Text) where
   parseJSON Null = pure $ Req mempty
