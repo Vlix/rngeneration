@@ -1,6 +1,6 @@
 module Main where
 
-import RNGeneration
+-- import RNGeneration
 
 main :: IO ()
 main = print "lol nope"
