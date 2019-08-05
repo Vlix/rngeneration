@@ -48,7 +48,11 @@ smushTests = testGroup "Smushing"
     , smushTest "Choice" "test3.yml" $ mkReq "A" :|| mkReqs ["B","C"]
     , smushTest "Complex" "test5.yml" IMPOSSIBLE
     , smushTest "Reduced (easy)" "test6.yml" $ mkReq "B" :&& (mkReq "A" :|| mkReq "C")
+    , smushTest "Reduced (hard)" "test7.yml" test7Req
     ]
+
+test7Req :: Requirement Text
+test7Req = mkReq "Z" :&& (mkReq "E" :|| (mkReqs ["A","B"] :|| mkReqs ["C","D"]))
 
 mkReq :: (Hashable a, Eq a) => a -> Requirement a
 mkReq a = mkReqs [a]

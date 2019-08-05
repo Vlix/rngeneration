@@ -1,0 +1,15 @@
+this:
+  - "Z"
+and:
+  choice:
+    - - "A"
+      - "B"
+    - this:
+        - "C"
+        - "D"
+      and:
+        choice:
+          - "Z"
+          - "F"
+    - - "Z"
+      - "E"
