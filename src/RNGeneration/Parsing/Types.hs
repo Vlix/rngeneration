@@ -5,13 +5,16 @@ module RNGeneration.Parsing.Types where
 import Control.Applicative ((<|>))
 import Control.Lens (makeLenses)
 import Data.Aeson
+import Data.DList as DL (DList, toList)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
+import Data.Graph (SCC(..), stronglyConnComp)
 import Data.Text (Text)
 
 import RNGeneration.Types
+import RNGeneration.Util (getReqs)
 
 
 -- | Cleaned up Settings after parsing (from ParseResult)
@@ -39,14 +42,17 @@ data Settings a = Settings {
   -- -- and add new AreaNames when new ones open up.
 }
 
-type ReqMap a = HashMap Text (NamedRequirement a)
+type ReqMap a = HashMap Text (Requirement a)
 type AllOptions = HashSet Option
 type AllCollectables = HashSet Collectable
 
-findClashingNames :: ReqMap Text -> AllCollectables -> AllOptions -> [Text]
+fromNamedReqs :: [NamedRequirement a] -> HashMap Text (Requirement a)
+fromNamedReqs nReqs = HM.fromList [(name, req) | NamedReq name req <- nReqs]
+
+findClashingNames :: ReqMap a -> AllCollectables -> AllOptions -> [Text]
 findClashingNames reqMap collSet' optSet' =
     optColl <> optReq <> collReq
-  where reqSet = HS.fromMap $ HM.map (const ()) reqMap
+  where reqSet = HM.keysSet reqMap
         collSet = HS.map collectableName collSet'
         optSet = HS.map optionName optSet'
         optColl = foldIt "Collectable/Option: " $ optSet `HS.intersection` collSet
@@ -55,7 +61,15 @@ findClashingNames reqMap collSet' optSet' =
         foldIt t = HS.foldl' go []
           where go acc el = (mappend t) el : acc
 
--- knownRef :: Text ->
+-- | Find cycles in NamedRequirement definitions
+reqMapCycles :: ReqMap Text -> [[Text]]
+reqMapCycles reqMap =
+    [g
+    | CyclicSCC g <- stronglyConnComp
+        [ (name, name, DL.toList $ getReqs req)
+        | (name, req) <- HM.toList reqMap
+        ]
+    ]
 
 
 data SettingPart = Start AreaName
@@ -91,7 +105,13 @@ makeLenses ''ErrorReport
 data ParseResult = ParseResult {
   _parsedStart :: [AreaName],
   _parsedAreas :: [Area Text],
+  _parsedUsedAreas :: DList AreaName,
+  -- ^ Found Areas in Connectors
+  _parsedUsedCollectables :: [Collectable],
+  -- ^ Found Collectabls in Connectors
   _parsedReqs :: [NamedRequirement Text],
+  _parsedUsedReqs :: DList Text,
+  -- ^ Found Reqs in Connectors
   _parsedOptions :: [Option]
 }
 makeLenses ''ParseResult
@@ -116,7 +136,10 @@ instance Semigroup ParseResult where
    pr1 <> pr2 = ParseResult {
       _parsedStart = _parsedStart pr1 <> _parsedStart pr2,
       _parsedAreas = _parsedAreas pr1 <> _parsedAreas pr2,
+      _parsedUsedAreas = _parsedUsedAreas pr1 <> _parsedUsedAreas pr2,
+      _parsedUsedCollectables = _parsedUsedCollectables pr1 <> _parsedUsedCollectables pr2,
       _parsedReqs = _parsedReqs pr1 <> _parsedReqs pr2,
+      _parsedUsedReqs = _parsedUsedReqs pr1 <> _parsedUsedReqs pr2,
       _parsedOptions = _parsedOptions pr1 <> _parsedOptions pr2
     }
 
@@ -145,7 +168,7 @@ instance Semigroup ParseState where
 --------- MONOIDS ---------
 
 instance Monoid ParseResult where
-  mempty = ParseResult mempty mempty mempty mempty
+  mempty = ParseResult mempty mempty mempty mempty mempty mempty mempty
 
 instance Monoid ErrorReport where
   mempty = ErrorReport mempty mempty mempty mempty
