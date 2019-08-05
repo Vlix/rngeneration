@@ -3,12 +3,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module RNGeneration.Util (
     smushReq
+  , getReqs
   , addConnector
   , connectsTo
   , nubWith
 ) where
 
 
+import Data.DList as DL (DList, fromList)
 import Data.Hashable
 import qualified Data.HashMap.Lazy as HM
 import Data.HashSet (HashSet)
@@ -169,10 +171,12 @@ intersectOR r1 r2 req = case req of
   where originalReq = (Req r1 :&& r2) :|| req
 
 
-
-
-
-
+-- | Used to get all uniquely named requirements from 1 requirement
+getReqs :: (Hashable a, Eq a) => Requirement a -> DList a
+getReqs IMPOSSIBLE = mempty
+getReqs (Req a) = DL.fromList . HS.toList $ a
+getReqs (a :&& b) = getReqs a <> getReqs b
+getReqs (a :|| b) = getReqs a <> getReqs b
 
 
 -- | Check for uniqueness before adding Connector to Area.
