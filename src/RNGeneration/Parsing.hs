@@ -11,14 +11,17 @@ import Control.Monad.Trans.Except hiding (catchE)
 import Control.Monad.Trans.State
 import Data.Aeson
 import Data.Aeson.Internal (formatError)
-import qualified Data.HashSet as HS
+import Data.DList as DL (fromList)
 import Data.Hashable (Hashable)
+import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
 import Data.Text (Text, intercalate, unpack)
 import Data.Yaml
 import Data.Yaml.Internal
 
-import RNGeneration.Types
 import RNGeneration.Parsing.Types
+import RNGeneration.Types
+import RNGeneration.Util
 
 
 parseJSONFile :: FilePath -> IO (Either String ParseResult)
@@ -97,20 +100,29 @@ modResult :: MonadState ParseState m
 modResult field = modifying (parseResult . field)
 
 parseArea :: Area Text -> State ParseState ()
-parseArea area@(Area name _itemConnect) = do
+parseArea area@(Area name itemConnect) = do
     duplicate <- name `isDuplicate` encounteredAreas
     if duplicate then modifying duplicateAreas $ (:) name
       else do
         modifying encounteredAreas $ HS.insert name
-        modifying (parseResult . parsedAreas) $ (:) area
+        modResult parsedAreas $ (:) area
+        case itemConnect of
+          Item coll ->
+            modResult parsedUsedCollectables $ (:) coll
+          Connect connMap -> do
+            let (areas,reqs) = unzip $ HM.toList connMap
+            modResult parsedUsedReqs $ mappend (foldl go mempty $ requirements <$> reqs)
+            modResult parsedUsedAreas $ mappend (DL.fromList areas)
+  where go acc el = getReqs el <> acc
 
 parseReq :: NamedRequirement Text -> State ParseState ()
-parseReq nr@(NamedReq name _) = do
+parseReq nr@(NamedReq name req) = do
     duplicate <- name `isDuplicate` encounteredReqs
     if duplicate then modifying duplicateReqs $ (:) name
       else do
         modifying encounteredReqs $ HS.insert name
-        modifying (parseResult . parsedReqs) $ (:) nr
+        modResult parsedReqs $ (:) nr
+        modResult parsedUsedReqs $ mappend (getReqs req)
 
 parseOption :: Option -> State ParseState ()
 parseOption opt = do
